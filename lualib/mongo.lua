@@ -7,6 +7,7 @@ local md5 =	require	"md5"
 local crypt = require "crypt"
 local rawget = rawget
 local assert = assert
+local table = table
 
 local bson_encode =	bson.encode
 local bson_encode_order	= bson.encode_order
@@ -395,8 +396,24 @@ function mongo_collection:find(query, selector)
 	} ,	cursor_meta)
 end
 
-function mongo_cursor:sort(key_list)
-	self.__sortquery = bson_encode {['$query'] = self.__query, ['$orderby'] = key_list}
+local function unfold(list, key, ...)
+	if key == nil then
+		return list
+	end
+	local next_func, t = pairs(key)
+	local k, v = next_func(t)	-- The first key pair
+	table.insert(list, k)
+	table.insert(list, v)
+	return unfold(list, ...)
+end
+
+-- cursor:sort { key = 1 } or cursor:sort( {key1 = 1}, {key2 = -1})
+function mongo_cursor:sort(key, key_v, ...)
+	if key_v then
+		local key_list = unfold({}, key, key_v , ...)
+		key = bson_encode_order(table.unpack(key_list))
+	end
+	self.__sortquery = bson_encode {['$query'] = self.__query, ['$orderby'] = key}
 	return self
 end
 
